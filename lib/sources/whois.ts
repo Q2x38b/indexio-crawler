@@ -73,7 +73,7 @@ export const whoisAdapter: SourceAdapter = {
         category: 'osint' as const,
         timestamp: whoisData.updatedDate || whoisData.createdDate,
         score: 0.85,
-        metadata: whoisData,
+        metadata: whoisData as Record<string, unknown>,
         favicon: 'https://who.is/favicon.ico',
       }
 
