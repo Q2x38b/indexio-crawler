@@ -3,78 +3,88 @@ import { rerankWithEmbeddings, rerankWithLocalSimilarity } from './embeddings'
 
 // Source trust scores (higher = more authoritative)
 const sourceTrustScores: Record<SourceType, number> = {
+  // Web & Knowledge
   wikipedia: 0.95,
   wikidata: 0.9,
-  arxiv: 0.95,
-  pubmed: 0.95,
+  duckduckgo: 0.75,
+  googlecse: 0.9,
+  archive: 0.8,
+  // Code & Development
   github: 0.85,
   stackoverflow: 0.85,
-  hackernews: 0.7,
-  reddit: 0.6,
   devto: 0.75,
   lobsters: 0.7,
   npm: 0.8,
   pypi: 0.8,
-  cve: 0.95,
+  // News & Social
+  hackernews: 0.7,
+  reddit: 0.6,
+  news: 0.7,
+  // OSINT & Security
   whois: 0.9,
   dns: 0.9,
+  cve: 0.95,
   company: 0.85,
   sec: 0.95,
-  archive: 0.8,
-  duckduckgo: 0.75,
-  news: 0.7,
+  username: 0.7,
+  ipgeo: 0.85,
+  // Research & Academic
+  arxiv: 0.95,
+  pubmed: 0.95,
+  crossref: 0.95,
+  worldbank: 0.9,
+  who: 0.95,
+  census: 0.9,
+}
+
+// Default relevance scores for all sources
+const defaultRelevance: Record<SourceType, number> = {
+  wikipedia: 0.5, wikidata: 0.5, duckduckgo: 0.5, googlecse: 0.5, archive: 0.4,
+  github: 0.4, stackoverflow: 0.4, devto: 0.4, lobsters: 0.4, npm: 0.3, pypi: 0.3,
+  hackernews: 0.4, reddit: 0.4, news: 0.4,
+  whois: 0.3, dns: 0.3, cve: 0.3, company: 0.4, sec: 0.3, username: 0.3, ipgeo: 0.3,
+  arxiv: 0.4, pubmed: 0.4, crossref: 0.4, worldbank: 0.4, who: 0.4, census: 0.4,
 }
 
 // Intent-source relevance (how well a source matches an intent)
-const intentSourceRelevance: Record<string, Record<SourceType, number>> = {
+const intentSourceRelevance: Record<string, Partial<Record<SourceType, number>>> = {
   general: {
-    wikipedia: 1.0, duckduckgo: 0.9, hackernews: 0.7, reddit: 0.6,
-    github: 0.5, stackoverflow: 0.4, arxiv: 0.4, devto: 0.5,
-    npm: 0.3, pypi: 0.3, cve: 0.2, whois: 0.2, dns: 0.2,
-    company: 0.4, sec: 0.3, archive: 0.5, lobsters: 0.5,
-    wikidata: 0.8, pubmed: 0.4, news: 0.6,
+    googlecse: 1.0, wikipedia: 0.95, duckduckgo: 0.9, hackernews: 0.7, reddit: 0.6,
+    wikidata: 0.8, archive: 0.5, news: 0.6, devto: 0.5, lobsters: 0.5,
   },
   tech: {
-    github: 1.0, stackoverflow: 1.0, npm: 0.9, pypi: 0.9,
-    devto: 0.85, hackernews: 0.8, lobsters: 0.8, wikipedia: 0.6,
-    reddit: 0.7, arxiv: 0.5, duckduckgo: 0.5, archive: 0.4,
-    cve: 0.3, whois: 0.2, dns: 0.2, company: 0.3, sec: 0.2,
-    wikidata: 0.5, pubmed: 0.3, news: 0.4,
+    github: 1.0, stackoverflow: 1.0, npm: 0.9, pypi: 0.9, devto: 0.85,
+    hackernews: 0.8, lobsters: 0.8, googlecse: 0.7, wikipedia: 0.6, reddit: 0.7,
   },
   security: {
-    cve: 1.0, github: 0.8, hackernews: 0.7, reddit: 0.6,
-    stackoverflow: 0.5, whois: 0.6, dns: 0.5, archive: 0.5,
-    wikipedia: 0.4, duckduckgo: 0.4, devto: 0.5, npm: 0.4,
-    pypi: 0.4, company: 0.3, sec: 0.3, arxiv: 0.4, lobsters: 0.6,
-    wikidata: 0.3, pubmed: 0.2, news: 0.5,
+    cve: 1.0, ipgeo: 0.9, github: 0.8, whois: 0.7, dns: 0.7,
+    hackernews: 0.7, reddit: 0.6, googlecse: 0.6, archive: 0.5, lobsters: 0.6,
   },
   domain: {
-    whois: 1.0, dns: 1.0, archive: 0.9, cve: 0.5,
-    wikipedia: 0.3, duckduckgo: 0.4, hackernews: 0.3, reddit: 0.3,
-    github: 0.2, stackoverflow: 0.2, devto: 0.2, npm: 0.1,
-    pypi: 0.1, company: 0.4, sec: 0.3, arxiv: 0.1, lobsters: 0.2,
-    wikidata: 0.3, pubmed: 0.1, news: 0.3,
+    whois: 1.0, dns: 1.0, archive: 0.9, ipgeo: 0.7, cve: 0.5,
+    googlecse: 0.5, company: 0.4, sec: 0.3,
   },
   company: {
-    company: 1.0, sec: 1.0, wikipedia: 0.8, hackernews: 0.7,
-    reddit: 0.6, duckduckgo: 0.6, github: 0.4, archive: 0.5,
-    whois: 0.4, cve: 0.2, stackoverflow: 0.2, devto: 0.3,
-    npm: 0.2, pypi: 0.2, arxiv: 0.2, lobsters: 0.4, dns: 0.3,
-    wikidata: 0.7, pubmed: 0.2, news: 0.7,
+    company: 1.0, sec: 1.0, wikipedia: 0.8, googlecse: 0.8, news: 0.8,
+    hackernews: 0.7, reddit: 0.6, wikidata: 0.7, worldbank: 0.5, archive: 0.5,
   },
   person: {
-    wikipedia: 1.0, wikidata: 0.9, reddit: 0.7, hackernews: 0.6,
-    duckduckgo: 0.7, github: 0.5, devto: 0.4, company: 0.4,
-    sec: 0.3, archive: 0.5, stackoverflow: 0.3, arxiv: 0.4,
-    npm: 0.2, pypi: 0.2, cve: 0.1, whois: 0.2, dns: 0.1,
-    lobsters: 0.4, pubmed: 0.5, news: 0.7,
+    wikipedia: 1.0, wikidata: 0.9, username: 0.9, googlecse: 0.8,
+    reddit: 0.7, hackernews: 0.6, github: 0.6, news: 0.7,
   },
   research: {
-    arxiv: 1.0, pubmed: 1.0, wikipedia: 0.8, wikidata: 0.7,
-    github: 0.5, duckduckgo: 0.5, hackernews: 0.4, reddit: 0.4,
-    stackoverflow: 0.3, devto: 0.3, npm: 0.2, pypi: 0.2,
-    cve: 0.2, whois: 0.1, dns: 0.1, company: 0.2, sec: 0.2,
-    archive: 0.4, lobsters: 0.3, news: 0.4,
+    arxiv: 1.0, pubmed: 1.0, crossref: 1.0, worldbank: 0.9, who: 0.9, census: 0.9,
+    wikipedia: 0.8, wikidata: 0.7, googlecse: 0.6,
+  },
+  ip: {
+    ipgeo: 1.0, whois: 0.8, dns: 0.8, cve: 0.5,
+  },
+  username: {
+    username: 1.0, github: 0.9, reddit: 0.8, hackernews: 0.7,
+    devto: 0.6, googlecse: 0.5,
+  },
+  doi: {
+    crossref: 1.0, arxiv: 0.9, pubmed: 0.9, googlecse: 0.5,
   },
 }
 
@@ -87,7 +97,8 @@ function calculateRelevanceScore(
 ): number {
   const baseScore = result.score || 0.5
   const trustScore = sourceTrustScores[result.source] || 0.5
-  const intentRelevance = intentSourceRelevance[intent.type]?.[result.source] || 0.5
+  const intentRelevanceMap = intentSourceRelevance[intent.type] || {}
+  const intentRelevance = intentRelevanceMap[result.source] ?? defaultRelevance[result.source] ?? 0.5
 
   // Combine scores with weights
   const combinedScore = (
