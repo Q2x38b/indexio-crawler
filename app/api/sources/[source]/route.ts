@@ -6,12 +6,13 @@ export const runtime = 'edge'
 // GET /api/sources/[source]?q=query - Search a specific source
 export async function GET(
   request: NextRequest,
-  { params }: { params: { source: string } }
+  { params }: { params: Promise<{ source: string }> }
 ) {
   const startTime = Date.now()
+  const { source: sourceParam } = await params
 
   try {
-    const source = params.source as SourceType
+    const source = sourceParam as SourceType
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q')?.trim()
     const limitParam = searchParams.get('limit')
@@ -50,12 +51,12 @@ export async function GET(
       timing: Date.now() - startTime,
     })
   } catch (error) {
-    console.error(`Source search error (${params.source}):`, error)
+    console.error(`Source search error (${sourceParam}):`, error)
 
     return NextResponse.json(
       {
         error: 'Search failed',
-        source: params.source,
+        source: sourceParam,
         message: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
