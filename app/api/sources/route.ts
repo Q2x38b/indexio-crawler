@@ -11,11 +11,10 @@ export async function GET(request: NextRequest) {
 
   const allSources = Object.entries(sourceAdapters).map(([key, adapter]) => ({
     id: key as SourceType,
-    name: adapter.config.name,
+    ...sourceMetadata[key as SourceType],
     category: adapter.config.category,
     enabled: adapter.config.enabled,
     timeout: adapter.config.timeout,
-    ...sourceMetadata[key as SourceType],
   }))
 
   if (category && category !== 'all') {
