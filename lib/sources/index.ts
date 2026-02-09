@@ -1,4 +1,5 @@
 import type { SourceAdapter, SourceType, CategoryType, SearchResult } from './types'
+import { categorySourceMap } from './types'
 import { wikipediaAdapter } from './wikipedia'
 import { githubAdapter } from './github'
 import { hackernewsAdapter } from './hackernews'
@@ -12,45 +13,58 @@ import { devtoAdapter } from './devto'
 import { npmAdapter, pypiAdapter } from './npm'
 import { archiveAdapter } from './archive'
 import { duckduckgoAdapter } from './duckduckgo'
+import { googleCSEAdapter } from './google-cse'
+import { worldBankAdapter } from './worldbank'
+import { whoAdapter } from './who'
+import { censusAdapter } from './census'
+import { usernameAdapter } from './username'
+import { ipgeoAdapter } from './ipgeo'
+import { crossrefAdapter } from './crossref'
 import { parallelFetch } from '@/lib/utils/fetcher'
 import { mergeResults } from '@/lib/utils/dedup'
 
 // Registry of all source adapters
 export const sourceAdapters: Record<SourceType, SourceAdapter> = {
+  // Web & Knowledge
   wikipedia: wikipediaAdapter,
-  wikidata: wikipediaAdapter, // Use same adapter
-  github: githubAdapter,
-  hackernews: hackernewsAdapter,
-  reddit: redditAdapter,
-  stackoverflow: stackoverflowAdapter,
-  arxiv: arxivAdapter,
-  pubmed: arxivAdapter, // Similar API pattern
-  cve: cveAdapter,
-  whois: whoisAdapter,
-  dns: whoisAdapter, // DNS is handled in whois adapter
-  company: companiesAdapter,
-  sec: companiesAdapter, // SEC is part of companies adapter
+  wikidata: wikipediaAdapter, // Use same adapter with wikidata mode
+  duckduckgo: duckduckgoAdapter,
+  googlecse: googleCSEAdapter,
   archive: archiveAdapter,
+  // Code & Development
+  github: githubAdapter,
+  stackoverflow: stackoverflowAdapter,
   devto: devtoAdapter,
-  lobsters: hackernewsAdapter, // Similar format
+  lobsters: devtoAdapter, // Similar format
   npm: npmAdapter,
   pypi: pypiAdapter,
+  // News & Social
+  hackernews: hackernewsAdapter,
+  reddit: redditAdapter,
   news: hackernewsAdapter, // Use HN as news source
-  duckduckgo: duckduckgoAdapter,
+  // OSINT & Security
+  whois: whoisAdapter,
+  dns: whoisAdapter, // DNS is handled in whois adapter
+  cve: cveAdapter,
+  company: companiesAdapter,
+  sec: companiesAdapter, // SEC is part of companies adapter
+  username: usernameAdapter,
+  ipgeo: ipgeoAdapter,
+  // Research & Academic
+  arxiv: arxivAdapter,
+  pubmed: arxivAdapter, // Similar API pattern
+  crossref: crossrefAdapter,
+  worldbank: worldBankAdapter,
+  who: whoAdapter,
+  census: censusAdapter,
 }
 
 // Get sources for a category
 export function getSourcesForCategory(category: CategoryType): SourceType[] {
-  const categoryMap: Record<CategoryType, SourceType[]> = {
-    web: ['wikipedia', 'duckduckgo', 'archive'],
-    code: ['github', 'stackoverflow', 'devto', 'npm', 'pypi'],
-    osint: ['whois', 'cve', 'company', 'archive'],
-    research: ['arxiv', 'wikipedia'],
-    news: ['hackernews', 'reddit', 'devto'],
-    all: Object.keys(sourceAdapters) as SourceType[],
+  if (category === 'all') {
+    return Object.keys(sourceAdapters) as SourceType[]
   }
-
-  return categoryMap[category] || categoryMap.all
+  return categorySourceMap[category] || []
 }
 
 // Search options
@@ -76,7 +90,7 @@ export async function searchAllSources(options: SearchOptions): Promise<{
     categories = ['all'],
     sources,
     limit = 10,
-    timeout = 3000,
+    timeout = 5000,
   } = options
 
   const startTime = Date.now()
@@ -129,7 +143,7 @@ export async function searchAllSources(options: SearchOptions): Promise<{
   const mergedResults = mergeResults(allResults)
 
   return {
-    results: mergedResults.slice(0, limit * 3), // Return more results for client-side filtering
+    results: mergedResults.slice(0, limit * 5), // Return more results for client-side filtering
     timing: Date.now() - startTime,
     sourcesQueried: sourcesToQuery.length,
     sourcesSucceeded,
@@ -158,6 +172,22 @@ export async function searchSources(
  */
 export function getSourceAdapter(source: SourceType): SourceAdapter | null {
   return sourceAdapters[source] || null
+}
+
+/**
+ * Get all enabled source names
+ */
+export function getEnabledSources(): SourceType[] {
+  return (Object.keys(sourceAdapters) as SourceType[]).filter(
+    source => sourceAdapters[source]?.config.enabled
+  )
+}
+
+/**
+ * Count total sources
+ */
+export function getTotalSourceCount(): number {
+  return Object.keys(sourceAdapters).length
 }
 
 // Re-export types

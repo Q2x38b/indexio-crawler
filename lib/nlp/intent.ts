@@ -1,54 +1,58 @@
 import type { QueryIntent, SourceType } from '@/lib/sources/types'
+import { intentSourceMap } from '@/lib/sources/types'
 import { isDomain, isIPAddress } from '@/lib/utils'
 
 // Intent patterns for local classification (no API needed)
 const intentPatterns = {
   domain: [
     /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z]{2,})+$/,
-    /\.(com|net|org|io|dev|app|co|ai|xyz|info|biz|gov|edu)$/i,
+    /\.(com|net|org|io|dev|app|co|ai|xyz|info|biz|gov|edu|uk|de|fr|jp)$/i,
   ],
   ip: [
     /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/,
     /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/,
   ],
+  username: [
+    /^@?[a-zA-Z][a-zA-Z0-9_]{2,30}$/,
+    /\b(username|user|profile|account|who\s+is\s+@)\b/i,
+    /^@[a-zA-Z0-9_]+$/,
+  ],
+  doi: [
+    /^10\.\d{4,}\/[^\s]+$/,
+    /doi\.org\/10\./i,
+    /\b(doi|citation|cite|paper\s+id)\b/i,
+  ],
   security: [
     /\b(cve|vulnerability|exploit|malware|attack|breach|hack)\b/i,
-    /\b(security|pentest|penetration|bug\s*bounty)\b/i,
+    /\b(security|pentest|penetration|bug\s*bounty|threat)\b/i,
     /CVE-\d{4}-\d+/i,
+    /\b(ransomware|phishing|ddos|botnet|rootkit)\b/i,
   ],
   company: [
-    /\b(company|corporation|corp|inc|llc|ltd|gmbh|plc)\b/i,
-    /\b(stock|ticker|sec|filing|investor|quarterly)\b/i,
-    /\b(founded|ceo|revenue|valuation|acquisition)\b/i,
+    /\b(company|corporation|corp|inc|llc|ltd|gmbh|plc|s\.?a\.?)\b/i,
+    /\b(stock|ticker|sec|filing|investor|quarterly|earnings)\b/i,
+    /\b(founded|ceo|revenue|valuation|acquisition|ipo|market\s*cap)\b/i,
   ],
   person: [
     /^[A-Z][a-z]+\s+[A-Z][a-z]+$/,
     /\b(who\s+is|biography|born|died|age\s+of)\b/i,
-    /\b(founder|ceo|president|director|author)\b/i,
+    /\b(founder|ceo|president|director|author|inventor)\b/i,
   ],
   tech: [
-    /\b(programming|code|coding|developer|software|api|sdk)\b/i,
-    /\b(javascript|typescript|python|rust|golang|react|vue|angular)\b/i,
-    /\b(npm|pip|package|library|framework|tutorial|docs)\b/i,
-    /\b(github|stackoverflow|documentation)\b/i,
+    /\b(programming|code|coding|developer|software|api|sdk|cli)\b/i,
+    /\b(javascript|typescript|python|rust|golang|java|c\+\+|ruby)\b/i,
+    /\b(react|vue|angular|nextjs|svelte|tailwind|bootstrap)\b/i,
+    /\b(npm|pip|cargo|package|library|framework|tutorial|docs)\b/i,
+    /\b(github|stackoverflow|documentation|how\s+to)\b/i,
+    /\b(bug|error|exception|debug|fix|issue)\b/i,
   ],
   research: [
-    /\b(research|paper|study|journal|academic|scientific)\b/i,
+    /\b(research|paper|study|journal|academic|scientific|scholar)\b/i,
     /\b(arxiv|pubmed|doi|citation|thesis|dissertation)\b/i,
-    /\b(hypothesis|methodology|findings|results)\b/i,
+    /\b(hypothesis|methodology|findings|results|experiment)\b/i,
+    /\b(health|disease|medicine|vaccine|treatment|clinical)\b/i,
+    /\b(gdp|economy|population|census|statistics|data)\b/i,
   ],
-}
-
-// Source recommendations based on intent
-const intentSourceMap: Record<string, SourceType[]> = {
-  domain: ['whois', 'archive', 'cve'],
-  ip: ['whois'],
-  security: ['cve', 'github', 'hackernews'],
-  company: ['company', 'wikipedia', 'hackernews', 'reddit'],
-  person: ['wikipedia', 'reddit', 'hackernews'],
-  tech: ['github', 'stackoverflow', 'npm', 'pypi', 'devto', 'hackernews'],
-  research: ['arxiv', 'wikipedia'],
-  general: ['wikipedia', 'duckduckgo', 'hackernews', 'reddit', 'github'],
 }
 
 /**
@@ -57,6 +61,16 @@ const intentSourceMap: Record<string, SourceType[]> = {
 export function classifyIntentLocal(query: string): QueryIntent {
   const queryLower = query.toLowerCase().trim()
   const entities: string[] = []
+
+  // Check for IP address first (most specific)
+  if (isIPAddress(query)) {
+    return {
+      type: 'ip',
+      confidence: 0.98,
+      entities: [query],
+      suggestedSources: intentSourceMap.ip,
+    }
+  }
 
   // Check for domain pattern
   if (isDomain(query)) {
@@ -68,16 +82,6 @@ export function classifyIntentLocal(query: string): QueryIntent {
     }
   }
 
-  // Check for IP address
-  if (isIPAddress(query)) {
-    return {
-      type: 'domain',
-      confidence: 0.95,
-      entities: [query],
-      suggestedSources: intentSourceMap.ip,
-    }
-  }
-
   // Check for CVE pattern
   const cveMatch = query.match(/CVE-\d{4}-\d+/i)
   if (cveMatch) {
@@ -86,6 +90,27 @@ export function classifyIntentLocal(query: string): QueryIntent {
       confidence: 0.98,
       entities: [cveMatch[0].toUpperCase()],
       suggestedSources: intentSourceMap.security,
+    }
+  }
+
+  // Check for DOI pattern
+  const doiMatch = query.match(/10\.\d{4,}\/[^\s]+/) || query.match(/doi\.org\/(10\.[^\s]+)/i)
+  if (doiMatch) {
+    return {
+      type: 'doi',
+      confidence: 0.98,
+      entities: [doiMatch[1] || doiMatch[0]],
+      suggestedSources: intentSourceMap.doi,
+    }
+  }
+
+  // Check for username pattern (starts with @)
+  if (query.startsWith('@') && /^@[a-zA-Z0-9_]{2,30}$/.test(query)) {
+    return {
+      type: 'username',
+      confidence: 0.95,
+      entities: [query.replace('@', '')],
+      suggestedSources: intentSourceMap.username,
     }
   }
 
@@ -108,13 +133,14 @@ export function classifyIntentLocal(query: string): QueryIntent {
   const sortedIntents = Object.entries(scores)
     .sort((a, b) => b[1] - a[1])
 
-  if (sortedIntents.length > 0 && sortedIntents[0][1] > 0.3) {
+  if (sortedIntents.length > 0 && sortedIntents[0][1] > 0.2) {
     const [type, confidence] = sortedIntents[0]
+    const intentType = type as QueryIntent['type']
     return {
-      type: type as QueryIntent['type'],
+      type: intentType,
       confidence: Math.min(confidence + 0.3, 0.9),
       entities,
-      suggestedSources: intentSourceMap[type] || intentSourceMap.general,
+      suggestedSources: intentSourceMap[intentType] || intentSourceMap.general,
     }
   }
 
@@ -157,7 +183,10 @@ export async function classifyIntentWithAI(query: string): Promise<QueryIntent> 
 - domain: Looking up a website or domain
 - tech: Programming, code, software related
 - security: Security vulnerabilities, CVEs, exploits
-- research: Academic, scientific research
+- research: Academic, scientific, health, economic research
+- ip: IP address lookup
+- username: Social media username lookup
+- doi: DOI/citation/paper lookup
 
 Respond with JSON only: {"type": "...", "confidence": 0.0-1.0, "entities": ["extracted entities"], "reason": "brief explanation"}`
           },
@@ -183,12 +212,13 @@ Respond with JSON only: {"type": "...", "confidence": 0.0-1.0, "entities": ["ext
     }
 
     const parsed = JSON.parse(content)
+    const intentType = (parsed.type || 'general') as QueryIntent['type']
 
     return {
-      type: parsed.type || 'general',
+      type: intentType,
       confidence: parsed.confidence || 0.7,
       entities: parsed.entities || [],
-      suggestedSources: intentSourceMap[parsed.type] || intentSourceMap.general,
+      suggestedSources: intentSourceMap[intentType] || intentSourceMap.general,
     }
   } catch (error) {
     console.error('AI intent classification error:', error)
@@ -210,11 +240,17 @@ export function expandQuery(query: string): string[] {
     'react': ['reactjs', 'react.js'],
     'vue': ['vuejs', 'vue.js'],
     'node': ['nodejs', 'node.js'],
+    'next': ['nextjs', 'next.js'],
     'api': ['rest api', 'http api'],
     'ml': ['machine learning'],
     'ai': ['artificial intelligence'],
     'db': ['database'],
     'sql': ['mysql', 'postgresql', 'database'],
+    'k8s': ['kubernetes'],
+    'docker': ['container', 'containerization'],
+    'aws': ['amazon web services'],
+    'gcp': ['google cloud platform'],
+    'azure': ['microsoft azure'],
   }
 
   for (const [term, syns] of Object.entries(synonyms)) {
@@ -226,4 +262,26 @@ export function expandQuery(query: string): string[] {
   }
 
   return [...new Set(expansions)]
+}
+
+/**
+ * Detect if query looks like a username
+ */
+export function isUsernameQuery(query: string): boolean {
+  // Starts with @
+  if (query.startsWith('@')) return true
+  // Single word, alphanumeric with underscores, reasonable length
+  if (/^[a-zA-Z][a-zA-Z0-9_]{2,30}$/.test(query) && !query.includes(' ')) {
+    // Avoid common words
+    const commonWords = ['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out']
+    return !commonWords.includes(query.toLowerCase())
+  }
+  return false
+}
+
+/**
+ * Detect if query is a DOI
+ */
+export function isDOI(query: string): boolean {
+  return /^10\.\d{4,}\//.test(query) || query.includes('doi.org/10.')
 }
