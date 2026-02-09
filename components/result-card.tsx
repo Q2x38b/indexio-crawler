@@ -73,35 +73,35 @@ export function ResultCard({
           {/* Metadata tags */}
           {result.metadata && (
             <div className="flex flex-wrap gap-1.5 mt-2">
-              {result.metadata.language && (
+              {typeof result.metadata.language === 'string' && (
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                  {result.metadata.language as string}
+                  {result.metadata.language}
                 </Badge>
               )}
-              {result.metadata.stars !== undefined && (
+              {typeof result.metadata.stars === 'number' && (
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                  {(result.metadata.stars as number).toLocaleString()} stars
+                  {result.metadata.stars.toLocaleString()} stars
                 </Badge>
               )}
-              {result.metadata.points !== undefined && (
+              {typeof result.metadata.points === 'number' && (
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                  {result.metadata.points as number} pts
+                  {result.metadata.points} pts
                 </Badge>
               )}
-              {result.metadata.severity && (
+              {typeof result.metadata.severity === 'string' && (
                 <Badge
                   variant={
-                    (result.metadata.severity as string) === 'CRITICAL' ||
-                    (result.metadata.severity as string) === 'HIGH'
+                    result.metadata.severity === 'CRITICAL' ||
+                    result.metadata.severity === 'HIGH'
                       ? 'destructive'
                       : 'secondary'
                   }
                   className="text-[10px] px-1.5 py-0"
                 >
-                  {result.metadata.severity as string}
+                  {result.metadata.severity}
                 </Badge>
               )}
-              {result.metadata.tags && Array.isArray(result.metadata.tags) && (
+              {Array.isArray(result.metadata.tags) && (
                 <>
                   {(result.metadata.tags as string[]).slice(0, 3).map((tag) => (
                     <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
