@@ -122,7 +122,8 @@ export const ipgeoAdapter: SourceAdapter = {
 
 async function getIPGeolocation(ip: string): Promise<SearchResult | null> {
   try {
-    const url = `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,mobile,proxy,hosting,query`
+    // Note: ip-api.com free tier only works with HTTP, but we try HTTPS first for Vercel edge
+    const url = `https://ip-api.com/json/${ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,mobile,proxy,hosting,query`
     const data = await fetchWithTimeout<IPAPIResponse>(url, {
       timeout: 3000,
     })

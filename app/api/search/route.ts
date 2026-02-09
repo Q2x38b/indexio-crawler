@@ -55,13 +55,13 @@ export async function GET(request: NextRequest) {
       ? await classifyIntentWithAI(query)
       : classifyIntentLocal(query)
 
-    // Search all sources
+    // Search all sources - don't filter by intent, query everything for comprehensive results
     const searchOptions: SearchOptions = {
       query,
       categories,
-      sources: sources || intent.suggestedSources,
+      sources, // Only use explicit sources if provided, otherwise search ALL sources
       limit,
-      timeout: 3500,
+      timeout: 6000, // Increased timeout for slower APIs
     }
 
     const searchResult = await searchAllSources(searchOptions)
@@ -124,9 +124,9 @@ export async function POST(request: NextRequest) {
     const searchResult = await searchAllSources({
       query,
       categories,
-      sources: sources || intent.suggestedSources,
+      sources, // Only use explicit sources if provided, otherwise search ALL sources
       limit,
-      timeout: 3500,
+      timeout: 6000, // Increased timeout for slower APIs
     })
 
     const ranked = await fullRankingPipeline(query, searchResult.results, intent, useAI)
