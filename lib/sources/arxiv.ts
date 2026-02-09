@@ -100,7 +100,7 @@ function parseArxivXml(xml: string): SearchResult[] {
         url: `https://arxiv.org/abs/${arxivId}`,
         source: 'arxiv' as const,
         category: 'research' as const,
-        timestamp: published,
+        timestamp: published ?? undefined,
         score: 0.75,
         metadata: {
           arxivId,
